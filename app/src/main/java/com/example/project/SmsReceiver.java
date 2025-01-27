@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.telephony.SmsMessage;
 import android.util.Patterns;
@@ -20,9 +19,17 @@ public class SmsReceiver extends BroadcastReceiver {
                 for (Object pdu : pdus) {
                     SmsMessage message = SmsMessage.createFromPdu((byte[]) pdu);
                     String msgBody = message.getMessageBody();
+                    String sender = message.getDisplayOriginatingAddress();
 
-                    // Check for URL in the message
+                    // Check if the message contains a URL
                     if (containsUrl(msgBody)) {
+                        // Pass the message to MainActivity (you could send a broadcast or use other methods)
+                        Intent msgIntent = new Intent(context, MainActivity.class);
+                        msgIntent.putExtra("message_sender", sender);
+                        msgIntent.putExtra("message_body", msgBody);
+                        context.startActivity(msgIntent);
+
+                        // Show dialog if URL is present
                         String url = extractUrl(msgBody);
                         if (url != null) {
                             showUrlDialog(context, url);
@@ -41,7 +48,7 @@ public class SmsReceiver extends BroadcastReceiver {
         String urlRegex = "(http|https)://[\\w\\-\\._~:/?#[\\]@!$&'()*+,;=%]+";
         java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(urlRegex);
         java.util.regex.Matcher matcher = pattern.matcher(message);
-        return matcher.find() ? matcher.group() : null; // Return the first URL found
+        return matcher.find() ? matcher.group() : null;
     }
 
     private void showUrlDialog(Context context, String url) {

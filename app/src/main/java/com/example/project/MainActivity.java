@@ -1,39 +1,26 @@
 package com.example.project;
 
-import android.Manifest;
+import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.provider.ContactsContract;
-import android.telephony.SmsMessage;
-import android.view.View;
+import android.os.Bundle;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import android.os.Bundle;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int SMS_PERMISSION_CODE = 101;
     private List<Message> messages;
     private MessageAdapter messageAdapter;
     private RecyclerView recyclerView;
-    private EditText searchBar;
+    private Button newChatButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,8 +28,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         recyclerView = findViewById(R.id.recyclerView);
-        searchBar = findViewById(R.id.search_bar);
-        Button newChatButton = findViewById(R.id.new_chat_button);
+        newChatButton = findViewById(R.id.new_chat_button);
 
         messages = new ArrayList<>();
         messageAdapter = new MessageAdapter(messages, this);
@@ -50,111 +36,57 @@ public class MainActivity extends AppCompatActivity {
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(messageAdapter);
 
+        // New message button click listener
         newChatButton.setOnClickListener(v -> openContacts());
 
-        if (checkPermissions()) {
-            loadMessages();
-        } else {
-            requestPermissions();
+        // Handle intent that contains the message details if any
+        Intent intent = getIntent();
+        if (intent != null && intent.hasExtra("message_sender") && intent.hasExtra("message_body")) {
+            String sender = intent.getStringExtra("message_sender");
+            String body = intent.getStringExtra("message_body");
+            addMessage(sender, body);
         }
     }
 
-    private boolean checkPermissions() {
-        int smsPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS);
-        int contactPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS);
-        return smsPermission == PackageManager.PERMISSION_GRANTED && contactPermission == PackageManager.PERMISSION_GRANTED;
-    }
-
-    private void requestPermissions() {
-        ActivityCompat.requestPermissions(this, new String[]{
-                Manifest.permission.RECEIVE_SMS,
-                Manifest.permission.READ_CONTACTS
-        }, SMS_PERMISSION_CODE);
-    }
-
-    private void loadMessages() {
-        if (!checkPermissions()) {
-            Toast.makeText(this, "SMS and Contacts permissions are required to load messages.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        if (messages.isEmpty()) {
-            displayNoMessages();
-        } else {
-            messageAdapter.notifyDataSetChanged();
-        }
-    }
-
-    private void displayNoMessages() {
-        TextView noMessagesView = findViewById(R.id.no_messages_view);
-        noMessagesView.setVisibility(View.VISIBLE);
-    }
-
-    private void openContacts() {
-        if (!checkPermissions()) {
-            Toast.makeText(this, "Permissions are required to access contacts.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        Intent intent = new Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI);
-        startActivityForResult(intent, 100);
-    }
-
+    // Add the message to the list and show toast if the message contains a URL
     public void addMessage(String sender, String content) {
-        messages.add(new Message(sender, content));
+        Message message = new Message(sender, content);
+        messages.add(message);
         messageAdapter.notifyItemInserted(messages.size() - 1);
         recyclerView.smoothScrollToPosition(messages.size() - 1);
 
-        // Check if the message contains a URL
+        // Show toast if the message contains a URL
         if (containsUrl(content)) {
-            String url = extractUrl(content);
-            showUrlWarningDialog(url);
+            Toast.makeText(this, "This message contains a URL", Toast.LENGTH_SHORT).show();
         }
     }
 
+    // Check if the message contains a URL
     private boolean containsUrl(String message) {
-        Pattern urlPattern = Pattern.compile("(http|https)://[\\w\\-\\._~:/?#[\\]@!$&'()*+,;=%]+");
-        Matcher matcher = urlPattern.matcher(message);
-        return matcher.find();
+        return message.contains("http://") || message.contains("https://");
     }
 
-    private String extractUrl(String message) {
-        Pattern urlPattern = Pattern.compile("(http|https)://[\\w\\-\\._~:/?#[\\]@!$&'()*+,;=%]+");
-        Matcher matcher = urlPattern.matcher(message);
-        return matcher.find() ? matcher.group() : null;
+    // Open contacts to start a new chat
+    private void openContacts() {
+        Intent intent = new Intent(Intent.ACTION_PICK, Uri.parse("content://contacts"));
+        intent.setType("vnd.android.cursor.dir/contact");
+        startActivityForResult(intent, 100); // Request code 100 for contacts
     }
 
+    // This method will show an alert dialog when a URL is clicked
     private void showUrlWarningDialog(String url) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("URL Detected")
-                .setMessage("This message contains a URL:\n\n" + url + "\n\nIt might be harmful. Do you want to proceed?")
+                .setMessage("This message contains a URL: " + url + ". Proceed with caution!")
                 .setPositiveButton("Proceed", (dialog, id) -> openUrlInBrowser(url))
-                .setNegativeButton("Exit", (dialog, id) -> dialog.dismiss());
+                .setNegativeButton("Cancel", (dialog, id) -> dialog.dismiss())
+                .setCancelable(false); // Prevent accidental dismiss
         builder.create().show();
     }
 
+    // Open the URL in the browser
     private void openUrlInBrowser(String url) {
         Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
         startActivity(browserIntent);
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == SMS_PERMISSION_CODE) {
-            boolean allPermissionsGranted = true;
-            for (int result : grantResults) {
-                if (result != PackageManager.PERMISSION_GRANTED) {
-                    allPermissionsGranted = false;
-                    break;
-                }
-            }
-            if (allPermissionsGranted) {
-                loadMessages();
-            } else {
-                Toast.makeText(this, "Permissions are required to use this app.", Toast.LENGTH_SHORT).show();
-                finish();
-            }
-        }
     }
 }
