@@ -26,21 +26,8 @@
         android:padding="8dp"
         android:layout_marginBottom="8dp" />
 
-    <!-- RecyclerView for displaying received messages -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerView"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:padding="8dp" />
 
-    <!-- Button for new chat -->
-    <Button
-        android:id="@+id/new_chat_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="New Message"
-        android:layout_gravity="end" />
+
 
     <!-- No messages TextView -->
     <TextView
